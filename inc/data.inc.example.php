@@ -1,5 +1,8 @@
 <?php
-//Sviluppo
+/*
+V 20190126.1 First release 
+*/
+//Sviluppo 
 if(USE_SANDBOX == true) {
     define( "ALIAS", "" );
     define( "MAC_KEY", "" );
