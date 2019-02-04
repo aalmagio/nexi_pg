@@ -2,6 +2,7 @@
 /*
 V 20190126.1 basic configuration NOT WORKING: just set up functions without relataions and without any call.
 V 20190204.1 FIRST WORKING RELESE.
+V 20190204.2 FIRST WORKING RELESE: decimal separator bug correction and security SMTP configuation within config.inc.php
 */
 require( 'inc/config.inc.php' );
 require( 'inc/data.inc.php' );
@@ -214,6 +215,10 @@ function Scrivipagamento_mysql( $pagamento ) {
         if( "," ==substr($pagamento->importo, -3, 1) || "."==substr($pagamento->importo, -3, 1) ){
         $decimal_thousand_separator = array(",",".");
         $importo = str_replace($decimal_thousand_separator, "", $pagamento->importo);
+        }
+        elseif( "," ==substr($pagamento->importo, -2, 1) || "."==substr($pagamento->importo, -2, 1) ){
+        $decimal_thousand_separator = array(",",".");
+        $importo = str_replace($decimal_thousand_separator, "", $pagamento->importo)."0";
         } 
         else{
             $decimal_thousand_separator = array(",",".");
@@ -246,9 +251,13 @@ function Scrivipagamento_mysql( $pagamento ) {
 function GoToPOS( $ordine ) {
     // Calcolo MAC
     if( "," ==substr($ordine->importo, -3, 1) || "."==substr($ordine->importo, -3, 1) ){
-    $decimal_thousand_separator = array(",",".");
-    $importo = str_replace($decimal_thousand_separator, "", $ordine->importo);
-    } 
+        $decimal_thousand_separator = array(",",".");
+        $importo = str_replace($decimal_thousand_separator, "", $ordine->importo);
+    }
+    elseif( "," ==substr($ordine->importo, -2, 1) || "."==substr($ordine->importo, -2, 1) ){
+        $decimal_thousand_separator = array(",",".");
+        $importo = str_replace($decimal_thousand_separator, "", $ordine->importo)."0";
+        } 
     else{
         $decimal_thousand_separator = array(",",".");
         $importo = str_replace($decimal_thousand_separator, "", $ordine->importo);
@@ -379,8 +388,8 @@ function NexiNotification( $notifica ) {
         $mail->SMTPDebug  = 0;                     // enables SMTP debug information (for testing)
                                                    // 1 = errors and messages
                                                    // 2 = messages only
-        $mail->SMTPSecure = 'tls'; 
-        $mail->SMTPAuth   = true;                  // enable SMTP authentication
+        $mail->SMTPSecure = EMAIL_SMTPSecure; 
+        $mail->SMTPAuth   = EMAIL_SMTP_auth;                  // enable SMTP authentication
         $mail->Host       = EMAIL_host; // sets the SMTP server
         $mail->Port       = EMAIL_host_port;                    // set the SMTP port for the GMAIL server
         $mail->Username   = EMAIL_authenticated_Username; // SMTP account username
