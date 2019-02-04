@@ -1,66 +1,12 @@
 <?php
 /*
-V 20190126.1 basic configuration NON WORKING: just set up function without relataion and without any call.
+V 20190126.1 basic configuration NOT WORKING: just set up functions without relataions and without any call.
+V 20190204.1 FIRST WORKING RELESE.
 */
 require( 'inc/config.inc.php' );
 require( 'inc/data.inc.php' );
-define( "LOG_FILE", "./eme_WS.log" ); //Togliere in Produzione
-function checkCC( $number ) {
-    //https://stackoverflow.com/questions/174730/what-is-the-best-way-to-validate-a-credit-card-in-php
-    $number = preg_replace( '/\D/', '', $number );
-    $supportedCircuit = "KO";
-    $Circuit = "Nessuno";
-    if ( substr( $number, 0, 2 ) == 30 || substr( $number, 0, 2 ) == 36 || substr( $number, 0, 2 ) == 38 ) {
-        $supportedCircuit = "KO";
-        $Circuit = "Diners";
-    } elseif ( substr( $number, 0, 2 ) == 34 || substr( $number, 0, 2 ) == 37 ) {
-            $supportedCircuit = "OK";
-            $Circuit = "American Express";
-        }
-        /*elseif(substr($number,0,4)==4539){
-        	$supportedCircuit = "OK";
-        	$Circuit = "CartaSI";
-        }*/
-    elseif ( substr( $number, 0, 2 ) >= 40 && substr( $number, 0, 2 ) <= 49 ) {
-        $supportedCircuit = "OK";
-        $Circuit = "CartaSI";
-    }
-    elseif ( substr( $number, 0, 2 ) >= 51 && substr( $number, 0, 2 ) <= 55 ) {
-        $supportedCircuit = "OK";
-        $Circuit = "MasterCard";
-    }
-    elseif ( substr( $number, 0, 4 ) >= 2221 && substr( $number, 0, 4 ) <= 2720 ) {
-        $supportedCircuit = "OK";
-        $Circuit = "MasterCard";
-    }
-    else {
-        $supportedCircuit = "KO";
-        $Circuit = "Circuito non supportato";
-    }
-    // Set the string length and parity
-    $number_length = strlen( $number );
-    $parity = $number_length % 2;
-    // Loop through each digit and do the maths
-    $total = 0;
-    for ( $i = 0; $i < $number_length; $i++ ) {
-        $digit = $number[ $i ];
-        // Multiply alternate digits by two
-        if ( $i % 2 == $parity ) {
-            $digit *= 2;
-            // If the sum is two digits, add them together (in effect)
-            if ( $digit > 9 ) {
-                $digit -= 9;
-            }
-        }
-        // Total up the digits
-        $total += $digit;
-    }
-    if ( $total % 10 === 0 ) {
-        return array( "", $Circuit, $supportedCircuit );
-    } else {
-        return array( "E027|", $Circuit, $supportedCircuit );
-    }
-}
+require( 'lib/CodiceFiscale.php' );
+define( "LOG_FILE", "./NEXI_WS.log" ); //Togliere in Produzione
 
 function ValidaAnagrafica( $anagrafica ) {
     $req_fields = explode( ",", $anagrafica->req_fields );
@@ -68,20 +14,15 @@ function ValidaAnagrafica( $anagrafica ) {
     //Nel db i campi che non possono essere NULL sono: Id_a, privacy, data_ins, tipo_ana 
     $errore = 0;
     $messaggio_errore = "";
-    if ( $anagrafica->sesso != "S" && ( !isset( $anagrafica->nome ) || trim( $anagrafica->nome ) == "" ) ) {
+    if ( !isset( $anagrafica->nome ) || trim( $anagrafica->nome ) == "" ) {
         $errore++;
         $messaggio_errore .= "M001|";
     }
-    //elseif (!preg_match("/^[a-zA-Z ]*$/",$anagrafica->nome)) { $errore++ ; $messaggio_errore .= "E001|";} 
-    if ( $anagrafica->sesso != "S" && ( !isset( $anagrafica->cognome ) || trim( $anagrafica->cognome ) == "" ) ) {
+    if ( !isset( $anagrafica->cognome ) || trim( $anagrafica->cognome ) == "" ) {
         $errore++;
         $messaggio_errore .= "M002|";
     }
-    //elseif (!preg_match("/^[a-zA-Z ]*$/",$anagrafica->cognome)) { $errore++ ; $messaggio_errore .= "E002|";} 
-    if ( $anagrafica->sesso == "S" && ( !isset( $anagrafica->ragioneSociale ) || trim( $anagrafica->ragioneSociale ) == "" ) ) {
-        $errore++;
-        $messaggio_errore .= "M003|";
-    }
+
     if ( in_array( "mail", $req_fields ) && ( !isset( $anagrafica->mail ) || trim( $anagrafica->mail ) == "" ) ) {
         $errore++;
         $messaggio_errore .= "M005|";
@@ -142,10 +83,6 @@ function ValidaAnagrafica( $anagrafica ) {
         $errore++;
         $messaggio_errore .= "M014|";
     }
-    if ( ( $anagrafica->pay_method == "SP" || $anagrafica->pay_method == "SD" ) && ( !isset( $anagrafica->codFis ) || trim( $anagrafica->codFis ) == "" ) ) {
-        $errore++;
-        $messaggio_errore .= "M014|";
-    } //Togliere se CF non obbligatorio per SDD
     $cf = new CodiceFiscale();
     if ( trim( $anagrafica->codFis ) != "" && $anagrafica->stato == "I" && !$cf->ValidaCodiceFiscale( $anagrafica->codFis ) ) {
         $errore++;
@@ -159,21 +96,9 @@ function ValidaAnagrafica( $anagrafica ) {
         $errore++;
         $messaggio_errore .= "E013|";
     }
-    if ( in_array( "id_fonte", $req_fields ) && ( !isset( $anagrafica->id_fonte ) || trim( $anagrafica->id_fonte ) == "" ) ) {
-        $errore++;
-        $messaggio_errore .= "M034|";
-    }
-    if ( in_array( "id_campagna", $req_fields ) && ( !isset( $anagrafica->id_campagna ) || trim( $anagrafica->id_campagna ) == "" ) ) {
-        $errore++;
-        $messaggio_errore .= "M035|";
-    }
     if ( !isset( $anagrafica->IP ) || trim( $anagrafica->IP ) == "" ) {
         $errore++;
         $messaggio_errore .= "M057|";
-    }
-    if ( !isset( $anagrafica->tipo_ana ) || trim( $anagrafica->tipo_ana ) == "" ) {
-        $errore++;
-        $messaggio_errore .= "M019|";
     }
     if ( !isset( $anagrafica->privacy ) || trim( $anagrafica->privacy ) == "" ) {
         $errore++;
@@ -186,68 +111,32 @@ function ScriviAnagrafica_mysql( $anagrafica ) { // Scrivo l'anagrafica in mySQL
     //verifico le variabili
     //Valorizzazione default delle varibaili (eventulamnte anche quelle obbligatorie nel database)
     $req_fields = explode( ",", $anagrafica->req_fields );
-    //Imposto a vuoto i campi eventualmente NON presnti nel form - INIZIO
-    if ( !isset( $anagrafica->codFis ) || trim( $anagrafica->codFis ) == "" ) {
-        $anagrafica->codFis = "";
-    }
-    if ( !isset( $anagrafica->PIVA ) || trim( $anagrafica->PIVA ) == "" ) {
-        $anagrafica->PIVA = "";
-    }
-    if ( !isset( $anagrafica->cap ) || trim( $anagrafica->cap ) == "" ) {
-        $anagrafica->cap = "";
-    }
-    if ( !isset( $anagrafica->citta ) || trim( $anagrafica->citta ) == "" ) {
-        $anagrafica->citta = "";
-    }
-    if ( !isset( $anagrafica->provincia ) || trim( $anagrafica->provincia ) == "" ) {
-        $anagrafica->provincia = "";
-    }
-    if ( !isset( $anagrafica->indirizzo ) || trim( $anagrafica->indirizzo ) == "" ) {
-        $anagrafica->indirizzo = "";
-    }
-    if ( !isset( $anagrafica->civico ) || trim( $anagrafica->civico ) == "" ) {
-        $anagrafica->civico = "";
-    }
-    if ( !isset( $anagrafica->tel ) || trim( $anagrafica->tel ) == "" ) {
-        $anagrafica->tel = "";
-    }
-    if ( !isset( $anagrafica->stato ) || trim( $anagrafica->stato ) == "" ) {
-        $anagrafica->stato = "";
-    }
-    //Imposto a vuoto i campi NON eventualmente presnti nel form - FINE
-    //
     //Imposto con valore di default i campi eventualmente NON presnti nel form - INIZIO
-    if ( !in_array( "sesso", $req_fields ) && ( !isset( $anagrafica->sesso ) || trim( $anagrafica->sesso ) == "" ) ) {
+    if ( !in_array( "sesso", $req_fields ) && ( !isset( $anagrafica->sesso ) || "" == trim( $anagrafica->sesso ) ) ) {
         $anagrafica->sesso = "X";
-    } //X =Daverificare 
-    if ( !isset( $anagrafica->privacy ) || trim( $anagrafica->privacy ) == "" ) {
-        $anagrafica->privacy = "Y";
-    } //TOGLIERE IN PRODUZIONE
-    if ( !in_array( "id_fonte", $req_fields ) && ( !isset( $anagrafica->id_fonte ) || trim( $anagrafica->id_fonte ) == "" ) )$anagrafica->id_fonte = ID_FONTE_DEFAULT;
-    if ( !in_array( "id_campagna", $req_fields ) && ( !isset( $anagrafica->id_campagna ) || trim( $anagrafica->id_campagna ) == "" ) )$anagrafica->id_campagna = ID_CAMPAGNA_DEFAULT;
-    if ( !isset( $anagrafica->IP ) || trim( $anagrafica->IP ) == "" )$anagrafica->IP = $_SERVER[ 'REMOTE_ADDR' ];
-    if ( !isset( $anagrafica->tipo_ana ) || trim( $anagrafica->tipo_ana ) == "" )$anagrafica->tipo_ana = "09";
-    if ( !isset( $anagrafica->lang ) || trim( $anagrafica->lang ) == "" )$anagrafica->lang = "it";
-    //Se Tessera
-    if ( $anagrafica->centro == TESSERA_COD ) { //TESSERA X SE
-        $anagrafica->tipo_ana = "10";
-    }
+    } //X =NON Definito 
+    if ( !isset( $anagrafica->IP ) || "" == trim( $anagrafica->IP ) )$anagrafica->IP = $_SERVER[ 'REMOTE_ADDR' ];
+    if ( !isset( $anagrafica->lang ) || "" == trim( $anagrafica->lang ) )$anagrafica->lang = DEFAULT_LN;
     //Imposto a valore di default i campi eventualmente NON presnti nel form - FINE
-    $chk_anagrafica = call_user_func_array( 'ValidaAnagrafica', array( $anagrafica ) ); // Vlaido l'anagrafica prima di scrivere in mysql
+    if ( 1 == CONTROLLO_ANAGRAFICA ) {
+        $chk_anagrafica = call_user_func_array( 'ValidaAnagrafica', array( $anagrafica ) ); // Vlaido l'anagrafica prima di scrivere in mysql
+    } else {
+        $chk_anagrafica[ 0 ] = 0;
+    }
     if ( $chk_anagrafica[ 0 ] <> 0 ) {
         return array( $chk_anagrafica[ 1 ], "" );
     } else {
         // connetto al db
-        $connection = mysqli_connect( E_DB_IP, E_DB_USER, E_DB_PASSWORD, E_DB_DBNAME );
+        $connection = mysqli_connect( DB_IP, DB_USER, DB_PASSWORD, DB_DBNAME );
         if ( $connection->connect_errno ) {
             trigger_error( "Connessione al server mySQL fallita: (" . $connection->connect_errno . ") " . $connection->connect_error, E_USER_ERROR );
         }
         // preparo lo statement
-        if ( !( $stmt = $connection->prepare( "INSERT INTO Anagrafica (nome, cognome, ragioneSociale, sesso, indirizzo, civico, cap, citta, provincia, stato, tel, mail, codFis, datanascita, privacy, id_fonte, id_campagna, IP, tipo_ana, operazione,lang ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,? )" ) ) ) {
+        if ( !( $stmt = $connection->prepare( "INSERT INTO Anagrafica (nome, cognome, sesso, indirizzo, civico, cap, citta, provincia, stato, tel, mail, codFis,  privacy, IP, lang ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )" ) ) ) {
             trigger_error( "Prepare failed: (" . $connection->errno . ") " . $connection->error, E_USER_ERROR );
         }
         // associo i parametri ai placeholder
-        if ( !$stmt->bind_param( 'sssssssssssssssisssss', $anagrafica->nome, $anagrafica->cognome, $anagrafica->ragioneSociale, $anagrafica->sesso, $anagrafica->indirizzo, $anagrafica->civico, $anagrafica->cap, $anagrafica->citta, strtoupper( $anagrafica->provincia ), $anagrafica->stato, $anagrafica->tel, $anagrafica->mail, $anagrafica->codFis, $anagrafica->mysqldatanascita, $anagrafica->privacy, $anagrafica->id_fonte, $anagrafica->id_campagna, $anagrafica->IP, $anagrafica->tipo_ana, $anagrafica->tipo_pagamento, $anagrafica->lang ) ) {
+        if ( !$stmt->bind_param( 'sssssssssssssss', $anagrafica->nome, $anagrafica->cognome, $anagrafica->sesso, $anagrafica->indirizzo, $anagrafica->civico, $anagrafica->cap, $anagrafica->citta, strtoupper( $anagrafica->provincia ), $anagrafica->stato, $anagrafica->tel, $anagrafica->mail, $anagrafica->codFis, $anagrafica->privacy, $anagrafica->IP, $anagrafica->lang ) ) {
             trigger_error( "Binding parameters failed: (" . $stmt->errno . ") " . $stmt->error, E_USER_ERROR );
         }
         // eseguo la query e chiudo
@@ -274,27 +163,11 @@ function Scrivipagamento_mysql( $pagamento ) {
         $micro_date = microtime();
         $date_array = explode( " ", $micro_date );
         $date = date( "YmdwHis", $date_array[ 1 ] );
-        //Inserire codice con desinenze specifiche //DA SVILIUPPARE 
-        if ( $pagamento->centro == TESSERA_COD ) { //TESSERA X SE
-            $pagamento->codTrans = "D-" . $date . substr( $date_array[ 0 ], 2, 2 ) . "-DT";
-            $pagamento->tessera = "Y";
-        } else {
-            $pagamento->codTrans = "D-" . $date . substr( $date_array[ 0 ], 2, 2 ) . "-DD";
-        }
-    }
-    if ( !in_array( "causale", $req_fields ) && ( !isset( $pagamento->causale ) || trim( $pagamento->causale ) == "" ) ) {
-        $pagamento->causale = "pagamento Libera";
-    }
-    if ( !isset( $pagamento->tessera ) || trim( $pagamento->tessera ) == "" ) {
-        $pagamento->tessera = "N";
+        $pagamento->codTrans = "T-" . $date . substr( $date_array[ 0 ], 2, 2 ) . "-PP";
     }
     if ( !isset( $pagamento->esito ) || trim( $pagamento->esito ) == "" ) {
         $pagamento->esito = "WA";
     }
-    if ( !in_array( "centro", $req_fields ) && ( !isset( $pagamento->centro ) || trim( $pagamento->centro ) == "" ) ) {
-        $pagamento->centro = CENTRO_DEFAULT;
-    }
-    //Se il campo e' vuoto posso valorizzarlo con un valore di defalut
     $errore = 0;
     $messaggio_errore = "";
     //codTrans, il codice di transazione lo genero nella funzione anziche' nel form ma se mi viene passato 
@@ -306,79 +179,59 @@ function Scrivipagamento_mysql( $pagamento ) {
     if ( !isset( $pagamento->importo ) || trim( $pagamento->importo ) == "" ) {
         $errore++;
         $messaggio_errore .= "M021|";
-    } elseif ( !preg_match( "/^[0-9]*$/", $pagamento->importo ) ) {
+    } elseif ( !preg_match( "/^[0-9]+[0-9,\.]*$/", $pagamento->importo ) ) {
         $errore++;
         $messaggio_errore .= "E021|";
     }
-    if ( $pagamento->tipo_pagamento == "oneoff" && defined( 'IMPORTO_MINIMO_ONE' ) && $pagamento->importo < IMPORTO_MINIMO_ONE ) {
-        $errore++;
-        $messaggio_errore .= "E021|";
-    }
-    if ( $pagamento->tipo_pagamento == "regular" ) {
-        $importo_annuo = 12 / $pagamento->frequenza * $pagamento->importo; //Importo Annuo
-        if ( defined( 'IMPORTO_MINIMO_REG' ) && $importo_annuo < IMPORTO_MINIMO_REG ) {
-            $errore++;
-            $messaggio_errore .= "E021|";
-        }
-    }
-    //Id_a e importo sono sempre obbligatori per la doanzione per cui non verifico nemmeno se sono in reqfield
-    if ( in_array( "pay_method", $req_fields ) && ( !isset( $pagamento->pay_method ) || trim( $pagamento->pay_method ) == "" ) ) {
-        $errore++;
-        $messaggio_errore .= "M056|";
-    }
-    if ( isset( $pagamento->pay_method ) && $pagamento->pay_method == "CC" ) { //Verifico la carta di credito
-        $verifyCard = checkCC( $pagamento->cartan );
-        if ( !isset( $pagamento->cartan ) || trim( $pagamento->cartan ) == "" ) {
-            $errore++;
-            $messaggio_errore .= "M027|";
-        } elseif ( $verifyCard[ 0 ] != "" ) {
-                $errore++;
-                $messaggio_errore .= "E027|";
-            }
-            //if ($verifyCard[0]=="" && $verifyCard[2] =="KO") {$errore++; $messaggio_errore .= "Circuito NON supportato";}
-        if ( !isset( $pagamento->exp_mm ) || trim( $pagamento->exp_mm ) == "" ) {
-            $errore++;
-            $messaggio_errore .= "M028|";
-        } elseif ( !preg_match( "/^(0[1-9]|1[012])$/", $pagamento->exp_mm ) ) {
-            $errore++;
-            $messaggio_errore .= "E028|";
-        }
-        if ( !isset( $pagamento->exp_yy ) || trim( $pagamento->exp_yy ) == "" ) {
-            $errore++;
-            $messaggio_errore .= "M029|";
-        } elseif ( !preg_match( "/^[0-9]{2}$/", $pagamento->exp_yy ) ) {
-            $errore++;
-            $messaggio_errore .= "E029|";
-        }
-    }
-    if ( in_array( "causale", $req_fields ) && ( !isset( $pagamento->causale ) || trim( $pagamento->causale ) == "" ) ) {
+    if ( in_array( "descrizione", $req_fields ) && trim( $pagamento->descrizione ) == "" ) {
         $errore++;
         $messaggio_errore .= "M026|";
     }
-    if ( in_array( "nota", $req_fields ) && ( !isset( $pagamento->nota ) || trim( $pagamento->nota ) == "" ) ) {
+        if ( in_array( "periodo", $req_fields ) && trim( $pagamento->periodo ) == "" ) {
         $errore++;
-        $messaggio_errore .= "M022|";
+        $messaggio_errore .= "E086|";
     }
-    if ( in_array( "centro", $req_fields ) && ( !isset( $pagamento->centro ) || trim( $pagamento->centro ) == "" ) ) {
-        $errore++;
-        $messaggio_errore .= "M024";
+    if (!isset($_REQUEST['data']) || "" == trim($_REQUEST['data'])){
+        $data_trans = date("Y-m-d");   
+    } 
+    else{ 
+        $data_trans= $_REQUEST['data'];
     }
+    if (!isset($_REQUEST['ora']) || "" == trim($_REQUEST['ora'])){
+        $ora_trans = date("H:i:s");   
+    } 
+    else{ 
+        $ora_trans= $_REQUEST['ora'];
+    }
+    
     if ( $errore > 0 ) {
         return $messaggio_errore;
     }
+    
     //
     else {
+        //Importo da autorizzare espresso in centesimi di euro senza separatore, i primi 2 numeri a destra rappresentano gli euro cent, es.: 5000 corrisponde a 50,00 €
+        if( "," ==substr($pagamento->importo, -3, 1) || "."==substr($pagamento->importo, -3, 1) ){
+        $decimal_thousand_separator = array(",",".");
+        $importo = str_replace($decimal_thousand_separator, "", $pagamento->importo);
+        } 
+        else{
+            $decimal_thousand_separator = array(",",".");
+            $importo = str_replace($decimal_thousand_separator, "", $pagamento->importo);
+            $importo = $importo ."00";
+            
+        }
         // connetto al db
-        $connection = mysqli_connect( E_DB_IP, E_DB_USER, E_DB_PASSWORD, E_DB_DBNAME );
+        $connection = mysqli_connect( DB_IP, DB_USER, DB_PASSWORD, DB_DBNAME );
         if ( $connection->connect_errno ) {
             trigger_error( "Connessione al server mySQL fallita: (" . $connection->connect_errno . ") " . $connection->connect_error, E_USER_ERROR );
         }
         // preparo lo statement
-        if ( !( $stmt = $connection->prepare( "INSERT INTO pagamento (codTrans,Id_a,importo,pay_method,causale,nota,tessera,tipotessera,esito,centro,tipo) VALUES (?,?,?,?,?,?,?,?,?,?,?)" ) ) ) {
+        if ( !( $stmt = $connection->prepare( "INSERT INTO pagamento (codTrans,Id_a,importo,descrizione,periodo,esito, data, ora, IP) VALUES (?,?,?,?,?,?,?,?,?)" ) ) ) {
             trigger_error( "Prepare failed: (" . $connection->errno . ") " . $connection->error, E_USER_ERROR );
         }
         // associo i parametri ai placeholder
-        if ( !$stmt->bind_param( 'sidssssssis', $pagamento->codTrans, $pagamento->Id_a, $pagamento->importo, $pagamento->pay_method, $pagamento->causale, $pagamento->nota, $pagamento->tessera, $pagamento->tipoTessera, $pagamento->esito, $pagamento->centro, $pagamento->tipo_pagamento ) ) {
+        if ( !$stmt->bind_param( 'sisssssss', $pagamento->codTrans, $pagamento->Id_a, $importo, $pagamento->descrizione, $pagamento->periodo, $pagamento->esito,  $data_trans, $ora_trans,  $pagamento->IP ) ) {
             trigger_error( "Binding parameters failed: (" . $stmt->errno . ") " . $stmt->error, E_USER_ERROR );
         }
         // eseguo la query e chiudo
@@ -390,101 +243,18 @@ function Scrivipagamento_mysql( $pagamento ) {
     }
 }
 
-function aggiornaAnagrafica_mysql( $anagrafica ) {
-    //connetto al db
-    if ( $anagrafica->centro == TESSERA_COD ) { //TESSERA X SE
-        $anagrafica->tipo_ana = "10";
-    } else {
-        $anagrafica->tipo_ana = "09";
-    }
-    $connection = mysqli_connect( E_DB_IP, E_DB_USER, E_DB_PASSWORD, E_DB_DBNAME );
-    if ( $connection->connect_errno ) {
-        trigger_error( "Connessione al server mySQL fallita: (" . $connection->connect_errno . ") " . $connection->connect_error, E_USER_ERROR );
-    }
-    // preparo lo statement
-    if ( !( $stmt = $connection->prepare( "UPDATE Anagrafica SET ID_Mentor=?, tipo_ana=?, sesso=? WHERE Id_a=?;" ) ) ) {
-        trigger_error( "Prepare failed: (" . $connection->errno . ") " . $connection->error, E_USER_ERROR );
-    }
-    // associo i parametri ai placeholder
-    if ( !$stmt->bind_param( 'sssi', $anagrafica->codiceAnagraficaMentor, $anagrafica->tipo_ana, $anagrafica->SessoMentor, $anagrafica->Id_a ) ) {
-        trigger_error( "Binding parameters failed: (" . $stmt->errno . ") " . $stmt->error, E_USER_ERROR );
-    }
-    // eseguo la query e chiudo
-    if ( !$stmt->execute() ) {
-        trigger_error( "Execute failed: (" . $stmt->errno . ") " . $stmt->error, E_USER_ERROR );
-    }
-    $stmt->close();
-}
-
-function aggiornapagamentoCodMentor_mysql( $pagamento ) {
-    // connetto al db
-    $connection = mysqli_connect( E_DB_IP, E_DB_USER, E_DB_PASSWORD, E_DB_DBNAME );
-    if ( $connection->connect_errno ) {
-        trigger_error( "Connessione al server mySQL fallita: (" . $connection->connect_errno . ") " . $connection->connect_error, E_USER_ERROR );
-    }
-    // preparo lo statement
-    if ( !( $stmt = $connection->prepare( "UPDATE pagamento SET CodiceMentor=? WHERE codTrans=?;" ) ) ) {
-        trigger_error( "Prepare failed: (" . $connection->errno . ") " . $connection->error, E_USER_ERROR );
-    }
-    // associo i parametri ai placeholder
-    if ( !$stmt->bind_param( 'ss', $pagamento->codicepagamentoMentor, $pagamento->codTrans ) ) {
-        trigger_error( "Binding parameters failed: (" . $stmt->errno . ") " . $stmt->error, E_USER_ERROR );
-    }
-    // eseguo la query e chiudo
-    if ( !$stmt->execute() ) {
-        trigger_error( "Execute failed: (" . $stmt->errno . ") " . $stmt->error, E_USER_ERROR );
-    }
-    $stmt->close();
-}
-
-function LeggiDati_mysql( $richiesta ) {
-    if ( isset( $richiesta->codTrans ) && trim( $richiesta->codTrans ) != "" && preg_match( "/^[A-Z]{1}-[0-9]{17}-[A-Z]{2}/", $richiesta->codTrans ) ) { // Query su codice transazione
-        $connection = mysqli_connect( E_DB_IP, E_DB_USER, E_DB_PASSWORD, E_DB_DBNAME )or trigger_error( mysqli_error(), E_USER_ERROR );
-        //mysql_select_db(E_DB_DBNAME, $connection);
-        $query_pagamento = sprintf( "SELECT Anagrafica.*, pagamento.importo, pagamento.pay_method, pagamento.tessera, pagamento.tipotessera, pagamento.esito, pagamento.`data`, pagamento.tipo FROM pagamento LEFT JOIN Anagrafica ON pagamento.Id_a = Anagrafica.Id_a WHERE pagamento.codTrans = '%s'", $richiesta->codTrans );
-        $pagamento = mysqli_query( $connection, $query_pagamento )or die( mysqli_error() );
-        $row_pagamento = mysqli_fetch_assoc( $pagamento );
-        $totalRows_pagamento = mysqli_num_rows( $pagamento );
-        $answer_pagamento = ( object )array();
-        foreach ( $row_pagamento as $key => $value ) {
-            if ( $key != "" && $key != NULL && $value != "" && $value != NULL ) {
-                $answer_pagamento->$key = $value;
-            }
-        }
-        return ( $answer_pagamento );
-    } elseif ( isset( $richiesta->Id_a ) && trim( $richiesta->Id_a ) != "" && is_numeric( $richiesta->Id_a ) ) { // Query su codice anagrafica
-        $connection = mysqli_connect( E_DB_IP, E_DB_USER, E_DB_PASSWORD, E_DB_DBNAME )or trigger_error( mysqli_error(), E_USER_ERROR );
-        //mysql_select_db(E_DB_DBNAME, $connection);
-        $query_anagrafica = sprintf( "SELECT * FROM Anagrafica WHERE Id_a = %s", $richiesta->Id_a );
-        $anagrafica = mysqli_query( $connection, $query_anagrafica )or die( mysqli_error() );
-        $row_anagrafica = mysqli_fetch_assoc( $anagrafica );
-        $totalRows_anagrafica = mysqli_num_rows( $anagrafica );
-        $answer_pagamento = ( object )array();
-        foreach ( $row_anagrafica as $key => $value ) {
-            if ( $key != "" && $key != NULL && $value != "" && $value != NULL ) {
-
-                $answer_pagamento->$key = $value;
-            }
-        }
-        $query_pagamento = sprintf( "SELECT pagamento.codTrans, pagamento.importo, pagamento.pay_method, pagamento.esito, pagamento.`data` FROM pagamento WHERE pagamento.Id_a = '%s'", $row_anagrafica[ 'Id_a' ] );
-        $pagamento = mysqli_query( $connection, $query_pagamento )or die( mysqli_error() );
-        $row_pagamento = mysqli_fetch_assoc( $pagamento );
-        $totalRows_pagamento = mysqli_num_rows( $pagamento );
-        if ( $totalRows_pagamento == 1 ) {
-            foreach ( $row_pagamento as $key => $value ) {
-                if ( $key != "" && $key != NULL && $value != "" && $value != NULL ) {
-                    $answer_pagamento->$key = $value;
-                }
-            }
-        }
-        return ( $answer_pagamento );
-    }
-}
-
 function GoToPOS( $ordine ) {
-    //$codTrans = "TESTPS_" . date('YmdHis');
-    //$importo = 5000;
     // Calcolo MAC
+    if( "," ==substr($ordine->importo, -3, 1) || "."==substr($ordine->importo, -3, 1) ){
+    $decimal_thousand_separator = array(",",".");
+    $importo = str_replace($decimal_thousand_separator, "", $ordine->importo);
+    } 
+    else{
+        $decimal_thousand_separator = array(",",".");
+        $importo = str_replace($decimal_thousand_separator, "", $ordine->importo);
+        $importo = $importo ."00";
+
+    }
     if ( 1 == LANGUAGE_MANAGER ) {
         $languageId = FORM_LANG;
     } elseif ( isset( $ordine->ln )AND "" != trim( $ordine->ln ) ) {
@@ -493,11 +263,13 @@ function GoToPOS( $ordine ) {
     else {
         $languageId = DEFAULT_LN;
     }
-    $mac = sha1( 'codTrans=' . $ordine->codTrans . 'divisa=' . CURRENCY . 'importo=' . $ordine->importo . MAC_KEY );
+    $mac = sha1( 'codTrans=' . $ordine->codTrans . 'divisa=' . CURRENCY . 'importo=' . $importo . MAC_KEY );
     // Parametri obbligatori
+    //Importo da autorizzare espresso in centesimi di euro senza separatore, i primi 2 numeri a destra rappresentano gli euro cent, es.: 5000 corrisponde a 50,00 €
+    
     $obbligatori = array(
         'alias' => ALIAS,
-        'importo' => $ordine->importo,
+        'importo' => $importo ,
         'divisa' => CURRENCY,
         'codTrans' => $ordine->codTrans,
         'url' => URL,
@@ -526,14 +298,209 @@ function GoToPOS( $ordine ) {
 
 function NexiNotification( $notifica ) {
     // Controllo che ci siano tutti i parametri di ritorno obbligatori per calcolare il MAC
-    $requiredParams = array( 'codTrans', 'esito', 'importo', 'divisa', 'data', 'orario', 'codAut', 'mac' );
+    $requiredParams = array( 'codTrans', 'esito', 'importo', 'divisa', 'codAut', 'mac' );
     foreach ( $requiredParams as $param ) {
         if ( !isset( $_REQUEST[ $param ] ) ) {
-            echo 'Paramentro mancante ' . $field;
-            header( '500 Internal Server Error', true, 500 );
+            //echo 'Paramentro mancante ' . $field;
+            header( "500 Internal Server Error", true, 500 );
             exit;
         }
     }
+    // Nel caso in cui non ci siano errori gestisco il parametro esito
+    if ( "OK" == $_REQUEST[ 'esito' ] || "KO" == $_REQUEST[ 'esito' ] ) {
+        $connection = mysqli_connect( DB_IP, DB_USER, DB_PASSWORD, DB_DBNAME );
+        $query_pagamento = sprintf( "SELECT anagrafica.*, pagamento.importo, pagamento.esito, pagamento.`data` FROM pagamento LEFT JOIN anagrafica ON pagamento.Id_a = anagrafica.Id_a WHERE pagamento.codTrans = '%s'", $_REQUEST[ 'codTrans' ] );
+        echo $query_pagamento;
+        $pagamento = mysqli_query( $connection, $query_pagamento );
+        $row_pagamento = mysqli_fetch_assoc( $pagamento );
+        $totalRows_pagamento = mysqli_num_rows( $pagamento );
+        $answer_pagamento = ( object )array();
+        foreach ( $row_pagamento as $key => $value ) {
+            if ( $key != "" && $key != NULL && $value != "" && $value != NULL ) {
+                $answer_pagamento->$key = $value;
+            }
+        }
+        // connetto al db
+        $connection = mysqli_connect( DB_IP, DB_USER, DB_PASSWORD, DB_DBNAME );
+        if ( $connection->connect_errno ) {
+            trigger_error( "Connessione al server mySQL fallita: (" . $connection->connect_errno . ") " . $connection->connect_error, E_USER_ERROR );
+        }
+        // preparo lo statement
+
+        if ( !( $stmt = $connection->prepare( "UPDATE pagamento SET esito=?, data=?, nazionalita=?, mac=?, codAut=?, tipoProdotto=?, alias=?, pan=?, brand=?, ora=?, divisa=?, scadenza_pan=?, codiceEsito=?, languageId=?, tipoTransazione=?, codiceConvenzione=?, tipo_richiesta=?, TCONTAB=?  WHERE codTrans=?;" ) ) ) {
+            trigger_error( "Prepare failed: (" . $connection->errno . ") " . $connection->error, E_USER_ERROR );
+        }
+        $data_trans = $_REQUEST[ 'data' ];
+        $ora_trans = $_REQUEST[ 'orario' ];  
+        // associo i parametri ai placeholder
+        if ( !$stmt->bind_param( 'sssssssssssssssssss', $_REQUEST[ 'esito' ], $data_trans, $_REQUEST[ 'nazionalita' ], $_REQUEST[ 'mac' ], $_REQUEST[ 'codAut' ], $_REQUEST[ 'tipoProdotto' ], $_REQUEST[ 'alias' ], $_REQUEST[ 'pan' ], $_REQUEST[ 'brand' ], $ora_trans, $_REQUEST[ 'divisa ' ], $_REQUEST[ 'scadenza_pan' ], $_REQUEST[ 'codiceEsito' ], $_REQUEST[ 'languageId' ], $_REQUEST[ 'tipoTransazione' ], $_REQUEST[ 'codiceConvenzione' ], $_REQUEST[ 'tipo_richiesta' ], $_REQUEST[ 'TCONTAB' ], $_REQUEST[ 'codTrans' ] ) ) {
+            trigger_error( "Binding parameters failed: (" . $stmt->errno . ") " . $stmt->error, E_USER_ERROR );
+        }
+        // eseguo la query e chiudo
+        if ( !$stmt->execute() ) {
+            trigger_error( "Execute failed: (" . $stmt->errno . ") " . $stmt->error, E_USER_ERROR );
+
+        }
+        $stmt->close();
+        // INIVIO MAIL - INIZIO
+        if ($row_pagamento['mail']){ 
+            $recipient = $row_pagamento['mail']; //recipient
+        }
+        else  { $recipient = EMAIL_authenticated_Username; } //recipient
+        if ("OK"==$_REQUEST[ 'esito' ] ){
+            $subject ="La transazione ha avuto esito postivo";
+        } else{
+            $subject ="La transazione ha avuto esito negativo";
+        }
+        $header = "From: ". EMAIL_display_Name . " <" . EMAIL_authenticated_Username . ">\r\n"; //optional headerfields
+        $testo_mail = file_get_contents(EMAIL_FOLDER."/".FORM_LANG."/esito_pagamento.html");
+        $patterns = array();
+        $patterns[0] = '/IMPORTO/';
+        $patterns[1] = '/CODTRANS/';
+        $patterns[2] = '/CODAUT/';
+        $patterns[3] = '/DATI_PERSONALI/';
+        $patterns[4] = '/CAUSALE/';
+        $patterns[5] = '/NOME/';
+        $replacements = array();
+        $replacements[0] = $row_pagamento['importo']/100;
+        $replacements[1] = $_REQUEST[ 'codTrans' ];
+        $replacements[2] = $_REQUEST[ 'codAut' ];
+    
+        $replacements[3] =ucwords(utf8_decode(stripslashes($row_pagamento['nome'])))." ". ucwords(utf8_decode(stripslashes($row_pagamento['cognome'])));
+
+        $replacements[4] = "CASA / DESCRIZIONE : " . utf8_decode(stripslashes($row_pagamento['descrizione'])) . "<br>Periodo: " . utf8_decode(stripslashes($row_pagamento['periodo']));
+        $replacements[5] =  ucwords(utf8_decode($row_pagamento['nome']));
+        $testo_mail_modificato = preg_replace($patterns, $replacements, $testo_mail);
+        require_once('class/PHPMailerAutoload.php');
+        // Nuova gestione e-mail
+        $mail             = new PHPMailer();
+        //$mail->SingleTo = true;
+        $mail->IsSMTP(); // telling the class to use SMTP
+        $mail->SMTPDebug  = 0;                     // enables SMTP debug information (for testing)
+                                                   // 1 = errors and messages
+                                                   // 2 = messages only
+        $mail->SMTPSecure = 'tls'; 
+        $mail->SMTPAuth   = true;                  // enable SMTP authentication
+        $mail->Host       = EMAIL_host; // sets the SMTP server
+        $mail->Port       = EMAIL_host_port;                    // set the SMTP port for the GMAIL server
+        $mail->Username   = EMAIL_authenticated_Username; // SMTP account username
+        $mail->Password   = EMAIL_authenticated_Psw;        // SMTP account password
+        $mail->SetFrom(EMAIL_authenticated_Username, EMAIL_display_Name);
+        $mail->AddReplyTo(EMAIL_authenticated_Username,EMAIL_display_Name);
+        //$mail->AddCC("",$Name);
+        //$mail->AddBCC("");
+        $mail->Subject    = $subject;
+        $mail->IsHTML(true); // send as HTML
+        $mail->AltBody= "Se non leggi clicca qui".
+        $mail->Body = $testo_mail_modificato;
+        $mail->AddAddress($recipient, "");// Produzione
+        /*
+        $mail->AddAttachment("images/phpmailer.gif");      // attachment
+        $mail->AddAttachment("images/phpmailer_mini.gif"); // attachment*/
+        //$mail->AddAttachment("formiscrizioni.JPG");
+        $mail->Send();        
+        /*if(!$mail->Send()) {
+            echo "Mailer Error: " . $mail->ErrorInfo;
+         } else {
+            echo "Message has been sent";
+         }*/
+        // INVIO MAIL - FINE
+        return ( $_REQUEST[ 'esito' ] );
+    }
+}
+
+//Inizio script 
+if ( DEBUG_AA == true ) {
+    error_log( date( '[Y-m-d H:i e] ' ) . "JSON chiamata : " . $query_json . PHP_EOL, 3, LOG_FILE ); //DEBUG_AA
+}
+/*
+// Per l'uso con JSON
+$query_stream = json_decode( $query_json, true ); 
+$query_action = (object) array(); // Azione richiesta la WebService
+foreach($query_stream as $key => $value){
+    if ($key!="" && $key!= NULL && $value!="" && $value != NULL){$query_action->$key=$value ;}
+}
+*/
+
+$query_data = ( object )array();
+//foreach($query_action->data as $key => $value){//Per l'uso con JSON 
+foreach ( $_REQUEST as $key => $value ) { // Per l'uso con GET/POST
+    if ( $key != "" && $key != NULL && $value != "" && $value != NULL ) {
+        $query_data->$key = trim( utf8_decode( $value ) );
+    }
+}
+
+if ( !isset( $query_data->req_fields ) || trim( $query_data->req_fields ) == "" ) {
+    $query_data->req_fields = REQ_FIELDS_DEFAULT; // Se non sono imposti i campi richiesti li valorizza con quelli di defult
+}
+//METODI
+
+if ( $query_data->operation == "do" && $query_data->param == "transaction" ) {
+    if ( DEBUG_AA == true ) {
+        error_log( date( '[Y-m-d H:i e] ' ) . "REQUEST pagamento ONEOFF" . PHP_EOL, 3, LOG_FILE ); //DEBUG_AA
+    }
+    //1 Scrivo l'anagrafica in mysql
+    $id_anagrafica = call_user_func_array( 'scriviAnagrafica_mysql', array( $query_data ) ); // Scrivo l'anagrafica in mysql
+    if ( is_numeric( $id_anagrafica[ 0 ] ) ) {
+        $_return_query[ 'anagrafica' ] = $id_anagrafica[ 0 ];
+        $_return_query[ 'anagrafica_esito' ] = "OK";
+        $risposta_ana[ 'Esito_mysql' ] = "OK";
+        $risposta_ana[ 'Messaggio_mysql' ] = "&Egrave; stata scritta in MYSQL l'anagrafica " . $id_anagrafica[ 0 ];
+        $risposta_ana[ 'id_anagrafica_mysql' ] = $id_anagrafica[ 0 ];
+        $query_data->Id_a = $id_anagrafica[ 0 ]; // Aggiungo l'id mysql dell'anagrafia a query_data
+        //2 Scrivo pagamento in mysql con id anagrfica (1) (Se ho scritto l'anagrafica)
+        $id_pagamento = call_user_func_array( 'Scrivipagamento_mysql', array( $query_data ) );
+        if ( preg_match( "/^[A-Z]{1}-[0-9]{17}-[A-Z]{2}/", $id_pagamento ) ) { //Verifico codice transazione (formato T-20170701608524665-PP)
+            $_return_query[ 'pagamento' ] = $id_pagamento;
+            $_return_query[ 'pagamento_esito' ] = "OK";
+            $risposta_pag[ 'Esito_mysql' ] = "OK";
+            $risposta_pag[ 'Messaggio_mysql' ] = "&Egrave; stata scritta in MYSQL il pagamento " . $id_pagamento;
+            $risposta_pag[ 'codTrans' ] = $id_pagamento;
+            $query_data->codTrans = $id_pagamento; // Aggiungo il codice di transazione a query_data
+            if ( $query_data->pay_method === "CC" ) { //Pagamanto con carta di credito
+                //3 Effettuo la transazione su NEXI con il codice transazione (2) e i dati del donatore (1)
+                $redirect_NEXI = call_user_func_array( 'GoToPOS', array( $query_data ) );
+                header( "Location: $redirect_NEXI" );
+                exit;
+                //echo $redirect_NEXI."<br>";
+            } elseif ( $query_data->pay_method === "PP" ) { //pagamento con PayPal
+                // PER SVILUPPO FUTURO	
+            }
+            else {
+                $risposta_trans[ 'Esito_trans' ] = "Altro";
+                $risposta_trans[ 'Messaggio_trans' ] = "Il sistema di pagamnto non &grave; supportato ";
+                $risposta_trans[ 'URL_trans' ] = "";
+                $risposta[ 'Transazione' ] = $risposta_trans;
+            }
+        } else { //errore scrittura promessa di pagamento in mysql
+            $_return_query[ 'pagamento' ] = $id_pagamento;
+            $_return_query[ 'pagamento_esito' ] = "KO";
+            $risposta_pag[ 'Esito_mysql' ] = "KO";
+            $risposta_pag[ 'Messaggio_mysql' ] = "Si &egrave; verificato un errore nella scrittura in MYSQL " . $id_pagamento;
+            $risposta_pag[ 'CodTrans' ] = $id_pagamento;
+        }
+        $risposta[ 'pagamento' ] = $risposta_pag;
+        //
+    } else { //errore scrittura anagrafica in mysql
+        $_return_query[ 'anagrafica_esito' ] = "KO";
+        $risposta_ana[ 'Esito_mysql' ] = "KO";
+        $risposta_ana[ 'Messaggio_mysql' ] = "Si &egrave; verificato un errore nella scrittura in MYSQL " . $id_anagrafica[ 0 ];
+        $risposta_ana[ 'id_anagrafica_mysql' ] = $id_anagrafica[ 0 ];
+    }
+    $risposta[ 'Anagrafica' ] = $risposta_ana;
+    $risposta_string = json_encode( $risposta );
+    $url_error = FORM . "?error=Y";
+    foreach ( $_return_query as $key => $value ) {
+        if ( $key != "" && $key != NULL && $value != "" && $value != NULL ) {
+            $url_error .= "&" . $key . "=" . $value;
+        }
+    }
+    header( "Location: $url_error" );
+    exit;
+    //ESITO - FINE
+    //Codice del WS - FINE
+} 
+elseif(isset($query_data->mac) && (isset($query_data->alias) &&  ALIAS == $query_data->alias ) ){ //NOTIFICATION NEXI
     // Calcolo MAC con i parametri di ritorno
     $macCalculated = sha1( 'codTrans=' . $_REQUEST[ 'codTrans' ] .
         'esito=' . $_REQUEST[ 'esito' ] .
@@ -545,15 +512,19 @@ function NexiNotification( $notifica ) {
     );
     // Verifico corrispondenza tra MAC calcolato e MAC di ritorno
     if ( $macCalculated != $_REQUEST[ 'mac' ] ) {
-        echo 'Errore MAC: ' . $macCalculated . ' non corrisponde a ' . $_REQUEST[ 'mac' ];
+        //echo 'Errore MAC: ' . $macCalculated . ' non corrisponde a ' . $_REQUEST[ 'mac' ];
         header( '500 Internal Server Error', true, 500 );
         exit;
-    }
-    // Nel caso in cui non ci siano errori gestisco il parametro esito
-    if ( $_REQUEST[ 'esito' ] == 'OK' ) {
-        header( 'OK, pagamento avvenuto, preso riscontro', true, 200 );
     } else {
-        header( 'KO, pagamento non avvenuto, preso riscontro', true, 200 );
+        $transaction = call_user_func_array( 'NexiNotification', array( $query_data ) ); // Scrivo l'anagrafica in mysql
+        if ( $transaction ) { //esito notifica
+            header( $transaction . ', pagamento avvenuto, preso riscontro', true, 200 );
+        }
+
     }
 }
+else {
+    //Resto del mondo
+}
+
 ?>
