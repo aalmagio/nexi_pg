@@ -3,6 +3,7 @@
 V 20190126.1 basic configuration NOT WORKING: just set up functions without relataions and without any call.
 V 20190204.1 FIRST WORKING RELESE.
 V 20190204.2 FIRST WORKING RELESE: decimal separator bug correction and security SMTP configuation within config.inc.php
+V 20190208.1 WORKING RELESE: Added Language managment
 */
 require( 'inc/config.inc.php' );
 require( 'inc/data.inc.php' );
@@ -118,6 +119,7 @@ function ScriviAnagrafica_mysql( $anagrafica ) { // Scrivo l'anagrafica in mySQL
     } //X =NON Definito 
     if ( !isset( $anagrafica->IP ) || "" == trim( $anagrafica->IP ) )$anagrafica->IP = $_SERVER[ 'REMOTE_ADDR' ];
     if ( !isset( $anagrafica->lang ) || "" == trim( $anagrafica->lang ) )$anagrafica->lang = DEFAULT_LN;
+    if ( !isset( $anagrafica->privacy ) || "" == trim( $anagrafica->privacy ) )$anagrafica->privacy = 'Y';
     //Imposto a valore di default i campi eventualmente NON presnti nel form - FINE
     if ( 1 == CONTROLLO_ANAGRAFICA ) {
         $chk_anagrafica = call_user_func_array( 'ValidaAnagrafica', array( $anagrafica ) ); // Vlaido l'anagrafica prima di scrivere in mysql
@@ -270,7 +272,19 @@ function GoToPOS( $ordine ) {
         $languageId = $ordine->ln;
     }
     else {
-        $languageId = DEFAULT_LN;
+        if (isset($_REQUEST['lang'])){
+            if ("ITALIANO"==$_REQUEST['lang']) {
+                $languageId = "ITA";
+            }elseif ("ENGLISH"==$_REQUEST['lang']) {
+                $languageId = "ENG";
+            }
+            else{
+                $languageId = DEFAULT_LN;   
+            }
+        }
+        else{
+            $languageId = DEFAULT_LN;
+        }
     }
     $mac = sha1( 'codTrans=' . $ordine->codTrans . 'divisa=' . CURRENCY . 'importo=' . $importo . MAC_KEY );
     // Parametri obbligatori
@@ -352,68 +366,70 @@ function NexiNotification( $notifica ) {
         }
         $stmt->close();
         // INIVIO MAIL - INIZIO
-        if ($row_pagamento['mail']){ 
-            $recipient = $row_pagamento['mail']; //recipient
-        }
-        else  { $recipient = EMAIL_authenticated_Username; } //recipient
-        if ("OK"==$_REQUEST[ 'esito' ] ){
-            $subject ="La transazione ha avuto esito postivo";
-        } else{
-            $subject ="La transazione ha avuto esito negativo";
-        }
-        $header = "From: ". EMAIL_display_Name . " <" . EMAIL_authenticated_Username . ">\r\n"; //optional headerfields
-        $testo_mail = file_get_contents(EMAIL_FOLDER."/".FORM_LANG."/esito_pagamento.html");
-        $patterns = array();
-        $patterns[0] = '/IMPORTO/';
-        $patterns[1] = '/CODTRANS/';
-        $patterns[2] = '/CODAUT/';
-        $patterns[3] = '/DATI_PERSONALI/';
-        $patterns[4] = '/CAUSALE/';
-        $patterns[5] = '/NOME/';
-        $replacements = array();
-        $replacements[0] = $row_pagamento['importo']/100;
-        $replacements[1] = $_REQUEST[ 'codTrans' ];
-        $replacements[2] = $_REQUEST[ 'codAut' ];
-    
-        $replacements[3] =ucwords(utf8_decode(stripslashes($row_pagamento['nome'])))." ". ucwords(utf8_decode(stripslashes($row_pagamento['cognome'])));
+        if ("1"==INVIO_MAIL){
+            if ($row_pagamento['mail']){ 
+                $recipient = $row_pagamento['mail']; //recipient
+            }
+            else  { $recipient = EMAIL_authenticated_Username; } //recipient
+            if ("OK"==$_REQUEST[ 'esito' ] ){
+                $subject ="La transazione ha avuto esito postivo";
+            } else{
+                $subject ="La transazione ha avuto esito negativo";
+            }
+            $header = "From: ". EMAIL_display_Name . " <" . EMAIL_authenticated_Username . ">\r\n"; //optional headerfields
+            $testo_mail = file_get_contents(EMAIL_FOLDER."/".FORM_LANG."/esito_pagamento.html");
+            $patterns = array();
+            $patterns[0] = '/IMPORTO/';
+            $patterns[1] = '/CODTRANS/';
+            $patterns[2] = '/CODAUT/';
+            $patterns[3] = '/DATI_PERSONALI/';
+            $patterns[4] = '/CAUSALE/';
+            $patterns[5] = '/NOME/';
+            $replacements = array();
+            $replacements[0] = $row_pagamento['importo']/100;
+            $replacements[1] = $_REQUEST[ 'codTrans' ];
+            $replacements[2] = $_REQUEST[ 'codAut' ];
 
-        $replacements[4] = "CASA / DESCRIZIONE : " . utf8_decode(stripslashes($row_pagamento['descrizione'])) . "<br>Periodo: " . utf8_decode(stripslashes($row_pagamento['periodo']));
-        $replacements[5] =  ucwords(utf8_decode($row_pagamento['nome']));
-        $testo_mail_modificato = preg_replace($patterns, $replacements, $testo_mail);
-        require_once('class/PHPMailerAutoload.php');
-        // Nuova gestione e-mail
-        $mail             = new PHPMailer();
-        //$mail->SingleTo = true;
-        $mail->IsSMTP(); // telling the class to use SMTP
-        $mail->SMTPDebug  = 0;                     // enables SMTP debug information (for testing)
-                                                   // 1 = errors and messages
-                                                   // 2 = messages only
-        $mail->SMTPSecure = EMAIL_SMTPSecure; 
-        $mail->SMTPAuth   = EMAIL_SMTP_auth;                  // enable SMTP authentication
-        $mail->Host       = EMAIL_host; // sets the SMTP server
-        $mail->Port       = EMAIL_host_port;                    // set the SMTP port for the GMAIL server
-        $mail->Username   = EMAIL_authenticated_Username; // SMTP account username
-        $mail->Password   = EMAIL_authenticated_Psw;        // SMTP account password
-        $mail->SetFrom(EMAIL_authenticated_Username, EMAIL_display_Name);
-        $mail->AddReplyTo(EMAIL_authenticated_Username,EMAIL_display_Name);
-        //$mail->AddCC("",$Name);
-        //$mail->AddBCC("");
-        $mail->Subject    = $subject;
-        $mail->IsHTML(true); // send as HTML
-        $mail->AltBody= "Se non leggi clicca qui".
-        $mail->Body = $testo_mail_modificato;
-        $mail->AddAddress($recipient, "");// Produzione
-        /*
-        $mail->AddAttachment("images/phpmailer.gif");      // attachment
-        $mail->AddAttachment("images/phpmailer_mini.gif"); // attachment*/
-        //$mail->AddAttachment("formiscrizioni.JPG");
-        $mail->Send();        
-        /*if(!$mail->Send()) {
-            echo "Mailer Error: " . $mail->ErrorInfo;
-         } else {
-            echo "Message has been sent";
-         }*/
-        // INVIO MAIL - FINE
+            $replacements[3] =ucwords(utf8_decode(stripslashes($row_pagamento['nome'])))." ". ucwords(utf8_decode(stripslashes($row_pagamento['cognome'])));
+
+            $replacements[4] = "CASA / DESCRIZIONE : " . utf8_decode(stripslashes($row_pagamento['descrizione'])) . "<br>Periodo: " . utf8_decode(stripslashes($row_pagamento['periodo']));
+            $replacements[5] =  ucwords(utf8_decode($row_pagamento['nome']));
+            $testo_mail_modificato = preg_replace($patterns, $replacements, $testo_mail);
+            require_once('class/PHPMailerAutoload.php');
+            // Nuova gestione e-mail
+            $mail             = new PHPMailer();
+            //$mail->SingleTo = true;
+            $mail->IsSMTP(); // telling the class to use SMTP
+            $mail->SMTPDebug  = 0;                     // enables SMTP debug information (for testing)
+                                                       // 1 = errors and messages
+                                                       // 2 = messages only
+            $mail->SMTPSecure = EMAIL_SMTPSecure; 
+            $mail->SMTPAuth   = EMAIL_SMTP_auth;                  // enable SMTP authentication
+            $mail->Host       = EMAIL_host; // sets the SMTP server
+            $mail->Port       = EMAIL_host_port;                    // set the SMTP port for the GMAIL server
+            $mail->Username   = EMAIL_authenticated_Username; // SMTP account username
+            $mail->Password   = EMAIL_authenticated_Psw;        // SMTP account password
+            $mail->SetFrom(EMAIL_authenticated_Username, EMAIL_display_Name);
+            $mail->AddReplyTo(EMAIL_authenticated_Username,EMAIL_display_Name);
+            //$mail->AddCC("",$Name);
+            //$mail->AddBCC("");
+            $mail->Subject    = $subject;
+            $mail->IsHTML(true); // send as HTML
+            $mail->AltBody= "Se non leggi clicca qui".
+            $mail->Body = $testo_mail_modificato;
+            $mail->AddAddress($recipient, "");// Produzione
+            /*
+            $mail->AddAttachment("images/phpmailer.gif");      // attachment
+            $mail->AddAttachment("images/phpmailer_mini.gif"); // attachment*/
+            //$mail->AddAttachment("formiscrizioni.JPG");
+            $mail->Send();        
+            /*if(!$mail->Send()) {
+                echo "Mailer Error: " . $mail->ErrorInfo;
+             } else {
+                echo "Message has been sent";
+             }*/
+            // INVIO MAIL - FINE
+        }
         return ( $_REQUEST[ 'esito' ] );
     }
 }
@@ -430,7 +446,6 @@ foreach($query_stream as $key => $value){
     if ($key!="" && $key!= NULL && $value!="" && $value != NULL){$query_action->$key=$value ;}
 }
 */
-
 $query_data = ( object )array();
 //foreach($query_action->data as $key => $value){//Per l'uso con JSON 
 foreach ( $_REQUEST as $key => $value ) { // Per l'uso con GET/POST
@@ -469,6 +484,7 @@ if ( $query_data->operation == "do" && $query_data->param == "transaction" ) {
             if ( $query_data->pay_method === "CC" ) { //Pagamanto con carta di credito
                 //3 Effettuo la transazione su NEXI con il codice transazione (2) e i dati del donatore (1)
                 $redirect_NEXI = call_user_func_array( 'GoToPOS', array( $query_data ) );
+               // echo $redirect_NEXI;
                 header( "Location: $redirect_NEXI" );
                 exit;
                 //echo $redirect_NEXI."<br>";
