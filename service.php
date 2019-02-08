@@ -4,7 +4,10 @@ V 20190126.1 basic configuration NOT WORKING: just set up functions without rela
 V 20190204.1 FIRST WORKING RELESE.
 V 20190204.2 FIRST WORKING RELESE: decimal separator bug correction and security SMTP configuation within config.inc.php
 V 20190208.1 WORKING RELESE: Added Language managment
+V 20190208.2 WORKING RELESE: Database tabele name configuration
+V 20190208.3 WORKING RELESE: URL and URL BACK specific for language
 */
+
 require( 'inc/config.inc.php' );
 require( 'inc/data.inc.php' );
 require( 'lib/CodiceFiscale.php' );
@@ -135,7 +138,7 @@ function ScriviAnagrafica_mysql( $anagrafica ) { // Scrivo l'anagrafica in mySQL
             trigger_error( "Connessione al server mySQL fallita: (" . $connection->connect_errno . ") " . $connection->connect_error, E_USER_ERROR );
         }
         // preparo lo statement
-        if ( !( $stmt = $connection->prepare( "INSERT INTO Anagrafica (nome, cognome, sesso, indirizzo, civico, cap, citta, provincia, stato, tel, mail, codFis,  privacy, IP, lang ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )" ) ) ) {
+        if ( !( $stmt = $connection->prepare( "INSERT INTO ".DB_TABLE_ANAGRAFICA." (nome, cognome, sesso, indirizzo, civico, cap, citta, provincia, stato, tel, mail, codFis,  privacy, IP, lang ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )" ) ) ) {
             trigger_error( "Prepare failed: (" . $connection->errno . ") " . $connection->error, E_USER_ERROR );
         }
         // associo i parametri ai placeholder
@@ -234,7 +237,7 @@ function Scrivipagamento_mysql( $pagamento ) {
             trigger_error( "Connessione al server mySQL fallita: (" . $connection->connect_errno . ") " . $connection->connect_error, E_USER_ERROR );
         }
         // preparo lo statement
-        if ( !( $stmt = $connection->prepare( "INSERT INTO pagamento (codTrans,Id_a,importo,descrizione,periodo,esito, data, ora, IP) VALUES (?,?,?,?,?,?,?,?,?)" ) ) ) {
+        if ( !( $stmt = $connection->prepare( "INSERT INTO ".DB_TABLE_PAGAMENTO." (codTrans,Id_a,importo,descrizione,periodo,esito, data, ora, IP) VALUES (?,?,?,?,?,?,?,?,?)" ) ) ) {
             trigger_error( "Prepare failed: (" . $connection->errno . ") " . $connection->error, E_USER_ERROR );
         }
         // associo i parametri ai placeholder
@@ -275,15 +278,23 @@ function GoToPOS( $ordine ) {
         if (isset($_REQUEST['lang'])){
             if ("ITALIANO"==$_REQUEST['lang']) {
                 $languageId = "ITA";
+                $url = URL;
+                $url_back = URL_BACK; 
             }elseif ("ENGLISH"==$_REQUEST['lang']) {
                 $languageId = "ENG";
+                $url = URL_ENG;
+                $url_back = URL_BACK_ENG; 
             }
             else{
-                $languageId = DEFAULT_LN;   
+                $languageId = DEFAULT_LN; 
+                $url = URL;
+                $url_back = URL_BACK;
             }
         }
         else{
             $languageId = DEFAULT_LN;
+            $url = URL;
+            $url_back = URL_BACK;
         }
     }
     $mac = sha1( 'codTrans=' . $ordine->codTrans . 'divisa=' . CURRENCY . 'importo=' . $importo . MAC_KEY );
@@ -295,8 +306,8 @@ function GoToPOS( $ordine ) {
         'importo' => $importo ,
         'divisa' => CURRENCY,
         'codTrans' => $ordine->codTrans,
-        'url' => URL,
-        'url_back' => URL_BACK,
+        'url' => $url,
+        'url_back' => $url_back,
         'mac' => $mac,
     );
     // Parametri facoltativi
@@ -332,7 +343,7 @@ function NexiNotification( $notifica ) {
     // Nel caso in cui non ci siano errori gestisco il parametro esito
     if ( "OK" == $_REQUEST[ 'esito' ] || "KO" == $_REQUEST[ 'esito' ] ) {
         $connection = mysqli_connect( DB_IP, DB_USER, DB_PASSWORD, DB_DBNAME );
-        $query_pagamento = sprintf( "SELECT anagrafica.*, pagamento.importo, pagamento.esito, pagamento.`data` FROM pagamento LEFT JOIN anagrafica ON pagamento.Id_a = anagrafica.Id_a WHERE pagamento.codTrans = '%s'", $_REQUEST[ 'codTrans' ] );
+        $query_pagamento = sprintf( "SELECT ".DB_TABLE_ANAGRAFICA.".*, ".DB_TABLE_PAGAMENTO.".importo, ".DB_TABLE_PAGAMENTO.".esito, ".DB_TABLE_PAGAMENTO.".`data` FROM ".DB_TABLE_PAGAMENTO." LEFT JOIN ".DB_TABLE_ANAGRAFICA." ON ".DB_TABLE_PAGAMENTO.".Id_a = ".DB_TABLE_ANAGRAFICA.".Id_a WHERE ".DB_TABLE_PAGAMENTO.".codTrans = '%s'", $_REQUEST[ 'codTrans' ] );
         echo $query_pagamento;
         $pagamento = mysqli_query( $connection, $query_pagamento );
         $row_pagamento = mysqli_fetch_assoc( $pagamento );
@@ -350,7 +361,7 @@ function NexiNotification( $notifica ) {
         }
         // preparo lo statement
 
-        if ( !( $stmt = $connection->prepare( "UPDATE pagamento SET esito=?, data=?, nazionalita=?, mac=?, codAut=?, tipoProdotto=?, alias=?, pan=?, brand=?, ora=?, divisa=?, scadenza_pan=?, codiceEsito=?, languageId=?, tipoTransazione=?, codiceConvenzione=?, tipo_richiesta=?, TCONTAB=?  WHERE codTrans=?;" ) ) ) {
+        if ( !( $stmt = $connection->prepare( "UPDATE ".DB_TABLE_PAGAMENTO." SET esito=?, data=?, nazionalita=?, mac=?, codAut=?, tipoProdotto=?, alias=?, pan=?, brand=?, ora=?, divisa=?, scadenza_pan=?, codiceEsito=?, languageId=?, tipoTransazione=?, codiceConvenzione=?, tipo_richiesta=?, TCONTAB=?  WHERE codTrans=?;" ) ) ) {
             trigger_error( "Prepare failed: (" . $connection->errno . ") " . $connection->error, E_USER_ERROR );
         }
         $data_trans = $_REQUEST[ 'data' ];

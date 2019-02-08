@@ -2,6 +2,7 @@
 /*
 V 20190126.1 First release
 V 20190204.1 FIRST WORKING RELESE
+V 20190208.3 WORKING RELESE: URL and URL BACK specific for language
 */
 define( "USE_SANDBOX", 1 ); //1 sito di sviluppo; 0 sito di produzione
 define( "DEBUG_AA", 1 ); // Attiva log codice 
@@ -23,7 +24,9 @@ define( "LIB_FOLDER", PERCORSO_DI_BASE . "/lib" );
 define( "PAGES_FOLDER", PERCORSO_DI_BASE . "/pages" );
 //NEXI - INIZIO
 define( "URL", $url_di_base . "/esito.php" );
+define ("URL_ENG", $url_di_base . "/result.php" );
 define( "URL_BACK", $url_di_base . "/annullo.php" );
+define ("URL_BACK_ENG", $url_di_base . "/cancellation.php" );
 define( "CURRENCY", "EUR" );
 define( "TCONTAB", "C" ); // Modalità di incasso C = Immediata D = Differita 
 //NEXI - FINE

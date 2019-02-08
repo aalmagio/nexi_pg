@@ -16,6 +16,8 @@ if(USE_SANDBOX == true) {
 	define('DB_USER','user'); //user mysql 
 	define('DB_PASSWORD','password'); //password mysql
 	define('DB_DBNAME','nome_dc_sviluppo'); //nome del db
+    define('DB_TABLE_ANAGRAFICA', 'anagrafica'); //nome dalla tabella delle anagrafiche
+    define('DB_TABLE_PAGAMENTO', 'pagamento'); //nome dalla tabella dei pagamenti
     //EMAIL
 	define("EMAIL_SMTPSecure", "tls"); // sets SMTP server secure connection
 	define("EMAIL_SMTP_auth", "true"); // sets SMTP server authentication
@@ -38,6 +40,8 @@ else{
 	define('DB_USER','user'); //user mysql 
 	define('DB_PASSWORD','password'); //password
 	define('DB_DBNAME','nome_dc_produzione'); //nome del db
+    define('DB_TABLE_ANAGRAFICA', 'anagrafica'); //nome dalla tabella delle anagrafiche
+    define('DB_TABLE_PAGAMENTO', 'pagamento'); //nome dalla tabella dei pagamenti
     //EMAIL
 	define("EMAIL_SMTPSecure", "tls"); // sets SMTP server secure connection
 	define("EMAIL_SMTP_auth", "true"); // sets SMTP server authentication
