@@ -8,6 +8,7 @@ define( "DEBUG_AA", 1 ); // Attiva log codice
 define( "REQ_FIELDS_DEFAULT", "nome,cognome,mail,descrizione,periodo" );
 define( "DEFAULT_LN", "ITA" ); //Lingua di default
 define( "CONTROLLO_ANAGRAFICA", 0 );
+define( "INVIO_MAIL", 0 );// Abilita invio mail di ringraziamanto 
 define( "FORM_LANG", DEFAULT_LN );
 if ( true == USE_SANDBOX ) {//Sviluppo
     define( "PERCORSO_DI_BASE", "/htdocs/public/stage" ); // Produzione 

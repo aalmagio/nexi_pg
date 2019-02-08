@@ -5,16 +5,17 @@ V 20190204.1 FIRST WORKING RELESE
 */
 //Sviluppo 
 if(USE_SANDBOX == true) {
+    //NEXI
     define( "ALIAS", "" );
     define( "MAC_KEY", "" );
     define( "GRUPPO", "" );
     define( "MERCHANT", "" );
 	define( "PAYMENT_URL", "https://int-ecommerce.nexi.it/ecomm/ecomm/DispatcherServlet" );
 	//DB
-    define('DB_IP','dbstage.sito.tld');//Produzione e Sviluppo: IP o FQDN del database 
-	define('DB_USER','user'); // Sviluppo: user mysql 
-	define('DB_PASSWORD','password'); // Sviluppo: password
-	define('DB_DBNAME','nome_dc_sviluppo'); // Sviluppo: nome del db
+    define('DB_IP','dbstage.sito.tld');//IP o FQDN del database 
+	define('DB_USER','user'); //user mysql 
+	define('DB_PASSWORD','password'); //password mysql
+	define('DB_DBNAME','nome_dc_sviluppo'); //nome del db
     //EMAIL
 	define("EMAIL_SMTPSecure", "tls"); // sets SMTP server secure connection
 	define("EMAIL_SMTP_auth", "true"); // sets SMTP server authentication
@@ -26,16 +27,17 @@ if(USE_SANDBOX == true) {
 }
 //Produzione
 else{ 
+    //NEXI
     define( "ALIAS", "" );
     define( "MAC_KEY", "" );
     define( "GRUPPO", "" );
     define( "MERCHANT", "" );
 	define( "PAYMENT_URL", "https://ecommerce.nexi.it/ecomm/ecomm/DispatcherServlet" );
 	//DB
-    define('DB_IP','db.sito.tld');//Produzione e Sviluppo: IP o FQDN del database 
-	define('DB_USER','user'); // Produzione: user mysql 
-	define('DB_PASSWORD','password'); // Produzione: password
-	define('DB_DBNAME','nome_dc_produzione'); // Produzione: nome del db
+    define('DB_IP','db.sito.tld');//IP o FQDN del database 
+	define('DB_USER','user'); //user mysql 
+	define('DB_PASSWORD','password'); //password
+	define('DB_DBNAME','nome_dc_produzione'); //nome del db
     //EMAIL
 	define("EMAIL_SMTPSecure", "tls"); // sets SMTP server secure connection
 	define("EMAIL_SMTP_auth", "true"); // sets SMTP server authentication
